@@ -10,15 +10,34 @@
 <title>漢字マスター 〜漢検チャレンジ〜</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html, body { height: 100%; overscroll-behavior: none; }
+  html, body { min-height: 100%; }
   body {
     font-family: "Hiragino Maru Gothic ProN", "Hiragino Sans", "Yu Gothic", sans-serif;
     background: linear-gradient(160deg, #fdf6e3 0%, #ffe9c7 100%);
     color: #4a3728;
     user-select: none; -webkit-user-select: none;
+    overscroll-behavior-y: auto;
   }
   .screen { display: none; min-height: 100vh; padding: 20px; }
   .screen.active { display: block; }
+  #screen-practice.active {
+    position: fixed; inset: 0; z-index: 1;
+    overflow-y: auto; -webkit-overflow-scrolling: touch;
+    padding: 16px 52px 24px 16px;
+  }
+
+  .scroll-rail {
+    position: fixed; right: 8px; top: 50%; transform: translateY(-50%);
+    display: none; flex-direction: column; gap: 10px; z-index: 60;
+  }
+  .scroll-rail.show { display: flex; }
+  .scroll-btn {
+    width: 44px; height: 44px; border: none; border-radius: 12px;
+    background: rgba(255,255,255,.95); color: #4a3728; font-size: 1.2rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,.18); cursor: pointer;
+    border: 2px solid #e8b04b;
+  }
+  .scroll-btn:active { transform: scale(0.95); }
 
   /* ===== 級選択画面 ===== */
   h1.title {
@@ -231,6 +250,11 @@
 
 <div class="stamp" id="stamp">💮</div>
 
+<div class="scroll-rail" id="scrollRail" aria-hidden="true">
+  <button type="button" class="scroll-btn" id="scrollUp" aria-label="上にスクロール">▲</button>
+  <button type="button" class="scroll-btn" id="scrollDown" aria-label="下にスクロール">▼</button>
+</div>
+
 <script>
 "use strict";
 
@@ -408,6 +432,9 @@ const state = {
 
 const VG = 109; // KanjiVG の viewBox サイズ
 const SAMPLE_N = 24; // 1画あたりの比較サンプル点数
+const DRAW_START = 8; // この距離以上動いたら書き始める
+const SCROLL_RATIO = 1.25; // 縦移動が横より大きければスクロールとみなす
+let pendingPointer = null;
 
 /* ==================================================================
    KanjiVG 読み込み(CDN + localStorage キャッシュ)
@@ -728,6 +755,12 @@ function renderLevelGrid() {
 function showScreen(id) {
   document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
   $(id).classList.add("active");
+  $("scrollRail").classList.toggle("show", id === "screen-practice");
+  if (id === "screen-practice") $("screen-practice").scrollTop = 0;
+}
+
+function practiceScrollStep() {
+  return Math.max(window.innerHeight * 0.55, 220);
 }
 
 /* ==================================================================
@@ -857,14 +890,31 @@ function toModel(e) {
   };
 }
 
-canvas.addEventListener("pointerdown", e => {
-  if ($("inputPen").checked && e.pointerType === "touch") return;
+function startStroke(e) {
   e.preventDefault();
   canvas.setPointerCapture(e.pointerId);
   state.drawing = true;
   state.currentStroke = [toModel(e)];
+  pendingPointer = null;
+}
+
+canvas.addEventListener("pointerdown", e => {
+  if ($("inputPen").checked && e.pointerType === "touch") return;
+  pendingPointer = { id: e.pointerId, x: e.clientX, y: e.clientY };
+  if (e.pointerType === "pen") startStroke(e);
 });
 canvas.addEventListener("pointermove", e => {
+  if (pendingPointer && pendingPointer.id === e.pointerId) {
+    const dx = e.clientX - pendingPointer.x;
+    const dy = e.clientY - pendingPointer.y;
+    const adx = Math.abs(dx), ady = Math.abs(dy);
+    if (ady > DRAW_START && ady > adx * SCROLL_RATIO) {
+      pendingPointer = null;
+      return;
+    }
+    if (adx > DRAW_START || ady > DRAW_START) startStroke(e);
+    return;
+  }
   if (!state.drawing) return;
   e.preventDefault();
   const events = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
@@ -877,6 +927,7 @@ canvas.addEventListener("pointermove", e => {
   }
 });
 function endStroke(e) {
+  pendingPointer = null;
   if (!state.drawing) return;
   state.drawing = false;
   if (state.currentStroke && state.currentStroke.length >= 1) {
@@ -1183,7 +1234,14 @@ $("btnClear").addEventListener("click", () => { state.userStrokes = []; redraw()
 $("btnHint").addEventListener("click", showHint);
 $("btnCheck").addEventListener("click", check);
 
-// スクロール抑止(キャンバス上)
+$("scrollUp").addEventListener("click", () => {
+  $("screen-practice").scrollBy({ top: -practiceScrollStep(), behavior: "smooth" });
+});
+$("scrollDown").addEventListener("click", () => {
+  $("screen-practice").scrollBy({ top: practiceScrollStep(), behavior: "smooth" });
+});
+
+// キャンバス上で実際に書いているときだけスクロールを抑止
 document.body.addEventListener("touchmove", e => {
   if (state.drawing) e.preventDefault();
 }, { passive: false });
