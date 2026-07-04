@@ -432,9 +432,6 @@ const state = {
 
 const VG = 109; // KanjiVG の viewBox サイズ
 const SAMPLE_N = 24; // 1画あたりの比較サンプル点数
-const DRAW_START = 8; // この距離以上動いたら書き始める
-const SCROLL_RATIO = 1.25; // 縦移動が横より大きければスクロールとみなす
-let pendingPointer = null;
 
 /* ==================================================================
    KanjiVG 読み込み(CDN + localStorage キャッシュ)
@@ -901,26 +898,13 @@ function startStroke(e) {
   canvas.setPointerCapture(e.pointerId);
   state.drawing = true;
   state.currentStroke = [toModel(e)];
-  pendingPointer = null;
 }
 
 canvas.addEventListener("pointerdown", e => {
   if ($("inputPen").checked && e.pointerType === "touch") return;
-  pendingPointer = { id: e.pointerId, x: e.clientX, y: e.clientY };
-  if (e.pointerType === "pen") startStroke(e);
+  startStroke(e);
 });
 canvas.addEventListener("pointermove", e => {
-  if (pendingPointer && pendingPointer.id === e.pointerId) {
-    const dx = e.clientX - pendingPointer.x;
-    const dy = e.clientY - pendingPointer.y;
-    const adx = Math.abs(dx), ady = Math.abs(dy);
-    if (ady > DRAW_START && ady > adx * SCROLL_RATIO) {
-      pendingPointer = null;
-      return;
-    }
-    if (adx > DRAW_START || ady > DRAW_START) startStroke(e);
-    return;
-  }
   if (!state.drawing) return;
   e.preventDefault();
   const events = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
@@ -933,7 +917,6 @@ canvas.addEventListener("pointermove", e => {
   }
 });
 function endStroke(e) {
-  pendingPointer = null;
   if (!state.drawing) return;
   state.drawing = false;
   if (state.currentStroke && state.currentStroke.length >= 1) {
