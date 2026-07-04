@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="漢字マスター">
@@ -23,7 +23,7 @@
   #screen-practice.active {
     position: fixed; inset: 0; z-index: 1;
     overflow-y: auto; -webkit-overflow-scrolling: touch;
-    padding: 16px 16px 24px;
+    padding: 16px 16px calc(24px + env(safe-area-inset-bottom, 0px));
   }
 
   /* ===== 級選択画面 ===== */
@@ -118,6 +118,42 @@
   }
   .answer-actions .btn { flex: 1 1 150px; max-width: 220px; }
   .pen-toggle { font-size: .85rem; color: #8a6d55; margin-top: 8px; }
+
+  /* iPhone Safari 下部ツールバー（戻る・進む・共有）と重ならないよう余白を確保 */
+  @media (max-width: 768px) {
+    #screen-practice.active {
+      padding-bottom: calc(150px + env(safe-area-inset-bottom, 0px));
+    }
+    .answer-actions {
+      position: fixed;
+      left: 0; right: 0;
+      bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+      z-index: 40;
+      margin: 0;
+      padding: 10px 14px;
+      background: rgba(255, 248, 235, 0.97);
+      border-top: 2px solid #e8d9c0;
+      box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.1);
+      gap: 8px;
+    }
+    .answer-actions .btn {
+      flex: 1 1 0;
+      max-width: none;
+      min-height: 48px;
+      padding: 12px 10px;
+      font-size: 1rem;
+    }
+    .answer-actions .btn-check { font-size: 1.05rem; }
+    .canvas-col {
+      padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+    }
+    .app-badge {
+      bottom: calc(118px + env(safe-area-inset-bottom, 0px));
+      right: 8px;
+      font-size: .62rem;
+      padding: 4px 8px;
+    }
+  }
 
   .side-col { flex: 1; min-width: 300px; max-width: 460px; display: flex; flex-direction: column; gap: 12px; }
   .hint-box, .result-box {
@@ -248,7 +284,7 @@
 "use strict";
 
 /* 更新のたびに更新日と連番を上げる */
-const APP_BUILD = { company: "AI 88 Heart", updated: "2026年7月4日", rev: 10 };
+const APP_BUILD = { company: "AI 88 Heart", updated: "2026年7月4日", rev: 11 };
 
 /* ==================================================================
    問題データ(漢検レベル別・代表的な漢字のサンプル)
