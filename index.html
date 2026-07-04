@@ -1,0 +1,980 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="漢字マスター">
+<link rel="manifest" href="manifest.json">
+<title>漢字マスター 〜漢検チャレンジ〜</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; overscroll-behavior: none; }
+  body {
+    font-family: "Hiragino Maru Gothic ProN", "Hiragino Sans", "Yu Gothic", sans-serif;
+    background: linear-gradient(160deg, #fdf6e3 0%, #ffe9c7 100%);
+    color: #4a3728;
+    user-select: none; -webkit-user-select: none;
+  }
+  .screen { display: none; min-height: 100vh; padding: 20px; }
+  .screen.active { display: block; }
+
+  /* ===== 級選択画面 ===== */
+  h1.title {
+    text-align: center; font-size: 2.2rem; margin: 16px 0 4px;
+    color: #b5432a; text-shadow: 2px 2px 0 #fff;
+  }
+  p.subtitle { text-align: center; font-size: 1rem; margin-bottom: 20px; color: #8a6d55; }
+  .level-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 14px; max-width: 1000px; margin: 0 auto;
+  }
+  .level-card {
+    background: #fff; border: 3px solid #e8b04b; border-radius: 18px;
+    padding: 18px 16px; cursor: pointer; text-align: center;
+    box-shadow: 0 4px 0 #d99a2b; transition: transform .1s;
+  }
+  .level-card:active { transform: translateY(3px); box-shadow: 0 1px 0 #d99a2b; }
+  .level-card .lv { font-size: 1.7rem; font-weight: bold; color: #b5432a; }
+  .level-card .desc { font-size: .85rem; color: #8a6d55; margin-top: 4px; }
+  .level-card .prog { font-size: .8rem; margin-top: 8px; color: #3f8f3f; font-weight: bold; }
+
+  /* ===== 練習画面 ===== */
+  .practice-wrap { max-width: 1100px; margin: 0 auto; }
+  .top-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; flex-wrap: wrap; gap: 8px; }
+  .btn {
+    border: none; border-radius: 14px; padding: 12px 20px; font-size: 1.05rem;
+    font-family: inherit; font-weight: bold; cursor: pointer;
+    box-shadow: 0 3px 0 rgba(0,0,0,.2); transition: transform .08s;
+    color: #fff;
+  }
+  .btn:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0,0,0,.2); }
+  .btn:disabled { opacity: .4; pointer-events: none; }
+  .btn-back { background: #9aa0a6; }
+  .btn-hint { background: #f0a020; }
+  .btn-check { background: #d9534f; font-size: 1.2rem; padding: 14px 30px; }
+  .btn-next { background: #3f8f3f; }
+  .btn-undo, .btn-clear { background: #7aa0c4; }
+  .btn-ghost { background: #fff; color: #8a6d55; border: 2px solid #d9c4a5; box-shadow: 0 2px 0 #d9c4a5; }
+
+  .question-box {
+    background: #fff; border-radius: 18px; padding: 14px 20px; margin-bottom: 12px;
+    border: 3px solid #e8b04b; text-align: center;
+  }
+  .question-box .lead { font-size: .9rem; color: #8a6d55; }
+  .question-box .sentence { font-size: 1.7rem; margin-top: 6px; letter-spacing: .1em; }
+  .question-box .sentence .blank {
+    display: inline-block; min-width: 2.2em; border-bottom: 4px solid #d9534f;
+    color: #d9534f; font-weight: bold; margin: 0 .1em;
+  }
+  .question-box .yomi { color: #b5432a; font-weight: bold; }
+
+  .main-area { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; align-items: flex-start; }
+  .canvas-col { text-align: center; }
+  #drawCanvas {
+    background: #fff; border-radius: 14px; border: 3px solid #c8a06a;
+    touch-action: none; display: block;
+  }
+  .canvas-tools { display: flex; gap: 10px; justify-content: center; margin-top: 10px; flex-wrap: wrap; }
+  .pen-toggle { font-size: .85rem; color: #8a6d55; margin-top: 8px; }
+
+  .side-col { flex: 1; min-width: 300px; max-width: 460px; display: flex; flex-direction: column; gap: 12px; }
+  .hint-box, .result-box {
+    background: #fff; border-radius: 16px; padding: 16px; border: 3px solid #d9c4a5;
+  }
+  .hint-box h3 { color: #f0a020; font-size: 1.05rem; margin-bottom: 8px; }
+  .hint-box .hint-item { background: #fff7e0; border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; font-size: 1rem; line-height: 1.5; }
+  .result-box h3 { font-size: 1.3rem; margin-bottom: 8px; }
+  .result-box.ok h3 { color: #3f8f3f; }
+  .result-box.warn h3 { color: #e07b00; }
+  .result-box.ng h3 { color: #d9534f; }
+  .result-box p { line-height: 1.6; margin-bottom: 8px; font-size: 1rem; }
+  .tips { background: #eef7ee; border-radius: 10px; padding: 10px 14px; }
+  .tips h4 { color: #3f8f3f; margin-bottom: 6px; font-size: .95rem; }
+  .tips li { margin-left: 1.2em; margin-bottom: 4px; line-height: 1.5; font-size: .95rem; }
+  .order-box { background: #fdf0ee; border-radius: 10px; padding: 10px 14px; margin-bottom: 8px; }
+  .order-box h4 { color: #d9534f; margin-bottom: 6px; font-size: .95rem; }
+  .model-box { background: #f2f6fb; border-radius: 10px; padding: 10px 14px; margin-bottom: 8px; text-align: center; }
+  .model-box h4 { color: #1a6fb5; margin-bottom: 6px; font-size: .95rem; text-align: left; }
+  .model-kanji {
+    display: inline-block; width: 170px; height: 170px; line-height: 170px;
+    font-size: 130px; text-align: center; color: #222;
+    font-family: "UD デジタル 教科書体 N-R", "UD Digi Kyokasho N-R", "YuKyokasho", "Klee One", "Hiragino Mincho ProN", "Yu Mincho", "MS Mincho", serif;
+    background:
+      linear-gradient(to right, transparent calc(50% - 1px), #dce6f0 calc(50% - 1px), #dce6f0 calc(50% + 1px), transparent calc(50% + 1px)),
+      linear-gradient(to bottom, transparent calc(50% - 1px), #dce6f0 calc(50% - 1px), #dce6f0 calc(50% + 1px), transparent calc(50% + 1px)),
+      #fff;
+    border: 2px solid #c9d8e8; border-radius: 10px;
+  }
+  #refCanvas { background: #fff; border: 2px solid #d9c4a5; border-radius: 10px; display: block; margin: 8px auto; }
+  .progress-label { font-weight: bold; color: #8a6d55; font-size: 1rem; }
+  .loading-msg { text-align: center; color: #8a6d55; padding: 8px; font-size: .9rem; }
+  .stamp {
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%) scale(0);
+    font-size: 7rem; pointer-events: none; z-index: 99; opacity: 0;
+  }
+  .stamp.show { animation: pop .9s ease forwards; }
+  @keyframes pop {
+    0% { transform: translate(-50%,-50%) scale(0); opacity: 0; }
+    40% { transform: translate(-50%,-50%) scale(1.3); opacity: 1; }
+    70% { transform: translate(-50%,-50%) scale(1); opacity: 1; }
+    100% { transform: translate(-50%,-50%) scale(1); opacity: 0; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ 級選択画面 ============ -->
+<div id="screen-level" class="screen active">
+  <h1 class="title">✏️ 漢字マスター</h1>
+  <p class="subtitle">漢検チャレンジ 〜タッチペンで書いておぼえよう〜</p>
+  <div class="level-grid" id="levelGrid"></div>
+  <p style="text-align:center; margin-top:24px; font-size:.8rem; color:#b09a80;">
+    書き順データ: <a href="https://kanjivg.tagaini.net/" style="color:#b09a80;">KanjiVG</a>(CC BY-SA 3.0)/ 初回はインターネット接続が必要です
+  </p>
+</div>
+
+<!-- ============ 練習画面 ============ -->
+<div id="screen-practice" class="screen">
+  <div class="practice-wrap">
+    <div class="top-bar">
+      <button class="btn btn-back" id="btnBack">← 級をえらぶ</button>
+      <span class="progress-label" id="progressLabel"></span>
+      <button class="btn btn-next" id="btnNext">つぎの問題 ▶</button>
+    </div>
+
+    <div class="question-box">
+      <div class="lead" id="questionLead">【　】に入る漢字を書こう</div>
+      <div class="sentence" id="questionSentence"></div>
+    </div>
+
+    <div class="main-area">
+      <div class="canvas-col">
+        <canvas id="drawCanvas"></canvas>
+        <div class="canvas-tools">
+          <button class="btn btn-undo" id="btnUndo">↩ 一画もどす</button>
+          <button class="btn btn-clear" id="btnClear">🗑 全部けす</button>
+          <button class="btn btn-hint" id="btnHint">💡 ヒント</button>
+          <button class="btn btn-check" id="btnCheck">✅ こたえあわせ</button>
+        </div>
+        <label class="pen-toggle">
+          <input type="checkbox" id="penOnly" checked> ペンだけで書く(指をむし)
+        </label>
+      </div>
+
+      <div class="side-col">
+        <div class="loading-msg" id="loadingMsg" style="display:none;">📖 漢字データを読みこみ中…</div>
+        <div class="hint-box" id="hintBox" style="display:none;">
+          <h3>💡 ヒント</h3>
+          <div id="hintList"></div>
+        </div>
+        <div class="result-box" id="resultBox" style="display:none;"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="stamp" id="stamp">💮</div>
+
+<script>
+"use strict";
+
+/* ==================================================================
+   問題データ(漢検レベル別・代表的な漢字のサンプル)
+   k: 漢字 / yomi: 読み / q: 問題文(★の位置に漢字が入る)
+   h1: ヒント1(部首・形) / h2: ヒント2(意味・おぼえかた)
+================================================================== */
+const LEVELS = [
+  { id: "10", name: "10級", desc: "小学1年生 修了レベル", items: [
+    { k:"山", yomi:"やま", q:"たかい ★に のぼる", h1:"たてぼうが 3ぼん あるよ。まんなかが いちばん たかい!", h2:"とがった みねが 3つ ならんだ かたちだよ。" },
+    { k:"川", yomi:"かわ", q:"★の みずは つめたい", h1:"3かくの かんじだよ。ながれる みずの かたち。", h2:"たてに 3ぼん、ながれるように かくよ。" },
+    { k:"月", yomi:"つき", q:"よるの そらに ★が でる", h1:"よるに ひかる まるいもの。はこの なかに よこぼうが 2ほん。", h2:"おにくの「にくづき」にも つかわれる かたちだよ。" },
+    { k:"火", yomi:"ひ", q:"★が あかく もえる", h1:"ひとが りょうてを あげたような かたち。てんが 2つ。", h2:"まんなかは「人」みたいな かたちだよ。" },
+    { k:"木", yomi:"き", q:"おおきな ★に せみが いる", h1:"よこぼう 1ぽんと たてぼう 1ぽん、それに はらいが 2つ。", h2:"えだと ねっこが ひろがった かたちだよ。" },
+    { k:"田", yomi:"た", q:"★んぼに みずを いれる", h1:"しかくの なかに じゅうじが あるよ。", h2:"うえから みた たんぼの かたちだよ。" },
+    { k:"手", yomi:"て", q:"★を きれいに あらう", h1:"よこぼうが 2ほん、まんなかに はねる たてぼう。", h2:"ゆびを ひろげた かたちから できた かんじだよ。" },
+    { k:"虫", yomi:"むし", q:"くさむらで ★を つかまえた", h1:"「中」に にているけど、したに てんが あるよ。", h2:"6かくの かんじ。さいごは てん!" },
+  ]},
+  { id: "9", name: "9級", desc: "小学2年生 修了レベル", items: [
+    { k:"春", yomi:"はる", q:"★に なると さくらが さく", h1:"「三」と「人」のしたに「日」があるよ。", h2:"おひさまの ひかりで めが でる きせつだよ。" },
+    { k:"夏", yomi:"なつ", q:"★やすみに うみへ いく", h1:"「一」のしたに「自」、さいごは ゆっくり はらうよ。", h2:"10かくの かんじ。さいごの はらいが ポイント!" },
+    { k:"雪", yomi:"ゆき", q:"まっしろな ★が つもる", h1:"うえは「あめかんむり」だよ。", h2:"あめかんむりの したに「ヨ」を かくよ。" },
+    { k:"星", yomi:"ほし", q:"よぞらに ★が かがやく", h1:"「日」の したに「生」を かくよ。", h2:"おひさま(日)から 生まれた ひかり、と おぼえよう。" },
+    { k:"海", yomi:"うみ", q:"ひろい ★で およぐ", h1:"ひだりに「さんずい」(みずの てん3つ)が あるよ。", h2:"さんずいの みぎに「毎」を かくよ。" },
+    { k:"風", yomi:"かぜ", q:"つめたい ★が ふく", h1:"そとがわは「かぜがまえ」。なかに「虫」が いるよ。", h2:"むかしのひとは かぜの なかに 虫が いると かんがえたんだって。" },
+    { k:"鳥", yomi:"とり", q:"★が そらを とぶ", h1:"「島」に にているね。したに てんが 4つ あるよ。", h2:"てん4つは とりの はね。11かくだよ。" },
+    { k:"声", yomi:"こえ", q:"おおきな ★で うたう", h1:"「士」の したに つづく かたち。7かくだよ。", h2:"「士」+「𠂉のような かたち」。こえを だす くちの かんじ。" },
+  ]},
+  { id: "8", name: "8級", desc: "小学3年生 修了レベル", items: [
+    { k:"病", yomi:"びょう", q:"★気(き)がなおって元気になる", h1:"「やまいだれ」の中に「丙」があるよ。", h2:"やまいだれは、人がベッドでねているすがたから できたんだ。" },
+    { k:"島", yomi:"しま", q:"ふねで小さな★にわたる", h1:"「鳥」ににているけど、下が「山」になっているよ。", h2:"鳥がやすむ海の山=しま、とおぼえよう。" },
+    { k:"橋", yomi:"はし", q:"川に大きな★がかかる", h1:"ひだりは「木へん」。みぎは「高」ににた「喬」。", h2:"木でつくった、たかくかかるもの=はし。16画だよ。" },
+    { k:"湖", yomi:"みずうみ", q:"★のほとりでキャンプをする", h1:"「さんずい」+「古」+「月」の3つでできているよ。", h2:"ひだりから じゅんばんに:さんずい→古→月。" },
+    { k:"鉄", yomi:"てつ", q:"★のぼうはとてもかたい", h1:"ひだりは「金へん」だよ。", h2:"金へんのみぎに「失」をかくよ。" },
+    { k:"泳", yomi:"およ(ぐ)", q:"プールで25メートル★ぐ", h1:"「さんずい」+「永」だよ。", h2:"水(さんずい)の中をながく(永)すすむ=およぐ。" },
+    { k:"薬", yomi:"くすり", q:"★をのんで早くねる", h1:"「くさかんむり」の下に「楽」があるよ。", h2:"草からつくられて、体を楽にするもの=くすり。" },
+    { k:"悲", yomi:"かな(しい)", q:"★しい映画をみてないた", h1:"「非」の下に「心」があるよ。", h2:"心が非(そむく)=かなしい気もち。12画だよ。" },
+  ]},
+  { id: "7", name: "7級", desc: "小学4年生 修了レベル", items: [
+    { k:"願", yomi:"ねが(う)", q:"星に★いごとをする", h1:"ひだりは「原」、みぎは「頁(おおがい)」だよ。", h2:"原っぱで頭(頁)を下げておいのりするイメージ。19画。" },
+    { k:"鏡", yomi:"かがみ", q:"★にうつった自分を見る", h1:"ひだりは「金へん」、みぎは「境」の右がわと同じだよ。", h2:"金ぞくをみがいてつくったから金へんなんだ。" },
+    { k:"静", yomi:"しず(か)", q:"図書館では★かにする", h1:"ひだりは「青」、みぎは「争」だよ。", h2:"青→争のじゅんに書くよ。あらそいが青(きよらか)にしずまる。" },
+    { k:"勇", yomi:"ゆう", q:"★気を出して手をあげた", h1:"「マ」+「田」+「力」でできているよ。", h2:"力がわきあがる=いさましい。9画だよ。" },
+    { k:"熱", yomi:"ねつ", q:"かぜをひいて★が出た", h1:"下に「れんが(れっか)」の点が4つあるよ。", h2:"火(れんが)であつくする。15画だよ。" },
+    { k:"折", yomi:"お(る)", q:"おり紙をはんぶんに★る", h1:"ひだりは「てへん」、みぎは「斤(おの)」だよ。", h2:"手におのをもって切る=おる。7画だよ。" },
+    { k:"泣", yomi:"な(く)", q:"ころんでいたくて★いた", h1:"「さんずい」+「立」だよ。", h2:"立ったまま水(なみだ)を流す=なく。" },
+    { k:"芸", yomi:"げい", q:"犬がおもしろい★をする", h1:"「くさかんむり」の下に「云」があるよ。", h2:"くさかんむり→二→ム のじゅんに書くよ。7画。" },
+  ]},
+  { id: "6", name: "6級", desc: "小学5年生 修了レベル", items: [
+    { k:"夢", yomi:"ゆめ", q:"ゆうべ楽しい★を見た", h1:"くさかんむり+「罒」+「冖」+「夕」の組み立てだよ。", h2:"夜(夕)に見るもの。13画だよ。" },
+    { k:"増", yomi:"ふ(える)", q:"町の人口が★える", h1:"ひだりは「つちへん」、みぎは「曽」だよ。", h2:"土がつみかさなってふえるイメージ。14画。" },
+    { k:"築", yomi:"きず(く)", q:"新しい家を★く", h1:"「たけかんむり」+「工」+「凡」+「木」だよ。", h2:"竹や木で建物をつくる=きずく。16画。" },
+    { k:"燃", yomi:"も(える)", q:"キャンプファイヤーが★える", h1:"ひだりは「火へん」、みぎは「然」だよ。", h2:"火+然(そのとおり)=もえる。16画だよ。" },
+    { k:"破", yomi:"やぶ(る)", q:"大会で記録を★る", h1:"ひだりは「石へん」、みぎは「皮」だよ。", h2:"石で皮をやぶるイメージ。10画だよ。" },
+    { k:"迷", yomi:"まよ(う)", q:"森の中で道に★う", h1:"「しんにょう」+「米」だよ。しんにょうは最後に書くよ。", h2:"米つぶのように分かれ道がたくさん=まよう。" },
+    { k:"絶", yomi:"た(える)", q:"人通りが★えた道", h1:"ひだりは「いとへん」、みぎは「色」だよ。", h2:"糸が切れてつながらない=たえる。12画。" },
+    { k:"導", yomi:"みちび(く)", q:"先生がチームを★く", h1:"「道」の下に「寸」があるよ。", h2:"道+寸(て)=手をとって道あんないする。15画。" },
+  ]},
+  { id: "5", name: "5級", desc: "小学6年生 修了レベル", items: [
+    { k:"疑", yomi:"うたが(う)", q:"友だちを★ってはいけない", h1:"ひだりは「匕」+「矢」、みぎは「マ」+「疋」だよ。", h2:"立ち止まってどちらか迷う形。14画だよ。" },
+    { k:"敬", yomi:"うやま(う)", q:"お年よりを★う", h1:"ひだりは「苟」、みぎは「攵(ぼくづくり)」だよ。", h2:"敬語の「敬」。12画だよ。" },
+    { k:"裁", yomi:"さば(く)", q:"公平に★く", h1:"「土」+「戈」の中に「衣」がかくれているよ。", h2:"布(衣)をたち切る=さばく・したてる。12画。" },
+    { k:"蒸", yomi:"む(す)", q:"★し暑い夏の日", h1:"くさかんむり+「丞」+「れんが(点4つ)」だよ。", h2:"火(点4つ)で湯気を上げる=むす。13画。" },
+    { k:"熟", yomi:"じゅく", q:"★したトマトはあまい", h1:"「享」+「丸」+「れんが(点4つ)」だよ。", h2:"火でじっくり煮る=じゅうぶんに実る。15画。" },
+    { k:"誕", yomi:"たん", q:"★生日(じょうび)ケーキを食べる", h1:"ひだりは「ごんべん」、みぎは「延」だよ。", h2:"命がのびて(延)生まれる日。15画だよ。" },
+    { k:"卵", yomi:"たまご", q:"★をわってオムレツを作る", h1:"左右がにた形で、点が2つあるよ。", h2:"魚のたまごがならんだ形からできたよ。7画。" },
+    { k:"幕", yomi:"まく", q:"劇の★が上がる", h1:"「莫」の下に「巾(はば)」があるよ。", h2:"布(巾)で日(莫)をかくすもの=まく。13画。" },
+  ]},
+  { id: "4", name: "4級", desc: "中学校 在学レベル", items: [
+    { k:"押", yomi:"お(す)", q:"エレベーターのボタンを★す", h1:"てへん+「甲」だよ。", h2:"手で甲(よろい)をおさえるイメージ。8画。" },
+    { k:"咲", yomi:"さ(く)", q:"桜の花が★く", h1:"くちへん+「关」だよ。", h2:"花がひらいて笑う(咲=わらうの古い字)。9画。" },
+    { k:"恋", yomi:"こい", q:"★の歌を口ずさむ", h1:"「亦」の下に「心」があるよ。", h2:"心がひかれる気もち。10画だよ。" },
+    { k:"突", yomi:"つ(く)", q:"ボールを頭で★く", h1:"「あなかんむり」+「大」だよ。", h2:"穴から犬(大)が飛び出す=とつぜん。8画。" },
+    { k:"汗", yomi:"あせ", q:"走って★をかいた", h1:"さんずい+「干」だよ。", h2:"体から出る水(さんずい)。6画だよ。" },
+    { k:"舞", yomi:"ま(う)", q:"花びらが空に★う", h1:"「無」の上部ににた形+「舛」だよ。", h2:"そでをひるがえしておどる形。15画。" },
+    { k:"迎", yomi:"むか(える)", q:"駅で友だちを★える", h1:"しんにょう+「卬」だよ。しんにょうは最後!", h2:"道(しんにょう)に出てあいさつする=むかえる。7画。" },
+    { k:"鈍", yomi:"にぶ(い)", q:"★い音がひびいた", h1:"金へん+「屯」だよ。", h2:"刃物(金)が切れない=にぶい。12画。" },
+  ]},
+  { id: "3", name: "3級", desc: "中学校 卒業レベル", items: [
+    { k:"慌", yomi:"あわ(てる)", q:"ねぼうして★てて家を出た", h1:"りっしんべん+「荒」だよ。", h2:"心(りっしんべん)が荒れる=あわてる。12画。" },
+    { k:"憩", yomi:"いこ(い)", q:"公園は市民の★いの場だ", h1:"「舌」+「自」+「心」の組み立てだよ。", h2:"舌と心を休める=いこい。16画だよ。" },
+    { k:"賢", yomi:"かしこ(い)", q:"★い犬が芸をおぼえた", h1:"「臣」+「又」の下に「貝」があるよ。", h2:"財(貝)をうまく治める=かしこい。16画。" },
+    { k:"鶏", yomi:"にわとり", q:"★が朝を告げる", h1:"みぎは「鳥」。ひだりは「爫」+「糸」+「大」だよ。", h2:"鳥の中でも家でかうとり=にわとり。19画。" },
+    { k:"峠", yomi:"とうげ", q:"★をこえると海が見えた", h1:"やまへん+「上」+「下」だよ。", h2:"山の上りと下りのさかいめ。日本で作られた漢字(国字)だよ。" },
+    { k:"隣", yomi:"とな(り)", q:"★の家の犬とあそぶ", h1:"こざとへん+「米」+「舛」だよ。", h2:"米をわけあうほど近い家=となり。16画。" },
+    { k:"膨", yomi:"ふく(らむ)", q:"パンの生地が★らむ", h1:"にくづき+「彭」だよ。", h2:"体(にくづき)がふとる=ふくらむ。16画。" },
+    { k:"隠", yomi:"かく(す)", q:"木のかげに★れる", h1:"こざとへん+「爫」+「ヨ」+「心」だよ。", h2:"丘(こざと)のかげに見えなくなる=かくれる。14画。" },
+  ]},
+  { id: "j2", name: "準2級", desc: "高校 在学レベル", items: [
+    { k:"窒", yomi:"ちつ", q:"空気の約8割は★素だ", h1:"あなかんむり+「至」だよ。", h2:"穴がふさがって息ができない=窒息の窒。11画。" },
+    { k:"崇", yomi:"すう", q:"英雄を★拝する", h1:"「山」+「宗」だよ。", h2:"山のように高くあがめる=崇拝。11画だよ。" },
+    { k:"憂", yomi:"うれ(い)", q:"国の行く末を★える", h1:"「頁」の変形+「冖」+「心」+「夂」だよ。", h2:"頭と心が重い=うれい。15画。憂鬱の「憂」。" },
+    { k:"缶", yomi:"かん", q:"★づめを開ける", h1:"「午」ににた形の下に「凵」があるよ。", h2:"素焼きのつぼの形からできた字。6画だよ。" },
+    { k:"陵", yomi:"りょう", q:"なだらかな丘★が続く", h1:"こざとへん+「夌」だよ。", h2:"大きな丘、天皇のお墓の意味もあるよ。11画。" },
+    { k:"妃", yomi:"ひ", q:"王★さまが登場する物語", h1:"おんなへん+「己」だよ。", h2:"王のつま=きさき。6画だよ。" },
+    { k:"楼", yomi:"ろう", q:"★閣から町を見わたす", h1:"きへん+「米」+「女」だよ。", h2:"木で組んだ高い建物=たかどの。13画。" },
+    { k:"淑", yomi:"しゅく", q:"★女(レディー)のふるまい", h1:"さんずい+「叔」だよ。", h2:"水のように清らかでしとやか。11画。" },
+  ]},
+  { id: "2", name: "2級", desc: "高校 卒業・大学一般レベル", items: [
+    { k:"鬱", yomi:"うつ", q:"憂★な気分が晴れた", h1:"「林」の間に「缶」、下に「冖」「鬯」「彡」…常用漢字で最多の29画!", h2:"木がしげって気がふさがる=うっそう・ゆううつ。" },
+    { k:"彙", yomi:"い", q:"語★を増やすために本を読む", h1:"「彑」+「冖」+「果」だよ。", h2:"同じなかまを集める=語彙(ごい)の彙。13画。" },
+    { k:"麺", yomi:"めん", q:"★類ではラーメンが好きだ", h1:"「麦」+「面」だよ。", h2:"麦の粉から作る=めん。16画だよ。" },
+    { k:"藤", yomi:"ふじ", q:"★の花がたなから垂れる", h1:"くさかんむり+「月」+「关」+「水の変形」だよ。", h2:"つる性の植物。名字にも多いね。18画。" },
+    { k:"柿", yomi:"かき", q:"秋になると★が実る", h1:"きへん+「市」だよ。", h2:"「市」の縦棒は一本につながっているよ。9画。" },
+    { k:"梨", yomi:"なし", q:"★のしるがあふれる", h1:"「利」の下に「木」があるよ。", h2:"切れ味(利)よくシャリっとした木の実。11画。" },
+    { k:"頬", yomi:"ほお", q:"★を赤らめて笑う", h1:"「夹」+「頁(おおがい)」だよ。", h2:"顔(頁)の両わき=ほほ。15画だよ。" },
+    { k:"拉", yomi:"ら", q:"★致事件のニュースを見る", h1:"てへん+「立」だよ。", h2:"手で引っぱっていく=拉致の拉。8画。" },
+  ]},
+  { id: "j1", name: "準1級", desc: "大学・一般(常用漢字外を含む)", items: [
+    { k:"嵐", yomi:"あらし", q:"★の前の静けさ", h1:"「山」+「風」だよ。", h2:"山から吹きおろす強い風=あらし。12画。" },
+    { k:"鷹", yomi:"たか", q:"大空を★が舞う", h1:"「まだれ」の中に「イ」+「隹」、下に「鳥」だよ。", h2:"能ある★は爪をかくす、の★だよ。24画!" },
+    { k:"蘇", yomi:"よみがえ(る)", q:"記憶が★る", h1:"くさかんむり+「魚」+「禾」だよ。", h2:"よみがえる=蘇生の蘇。19画だよ。" },
+    { k:"凛", yomi:"りん", q:"★とした立ちすがた", h1:"にすい+「亠」+「回」+「禾」だよ。", h2:"氷(にすい)のようにひきしまった様子。15画。" },
+    { k:"楓", yomi:"かえで", q:"★の葉が赤く色づく", h1:"きへん+「風」だよ。", h2:"風にゆれる木=かえで。13画だよ。" },
+    { k:"遥", yomi:"はる(か)", q:"★かかなたの山なみ", h1:"しんにょう+「䍃」だよ。しんにょうは最後!", h2:"道(しんにょう)が遠くまでつづく=はるか。12画。" },
+    { k:"灼", yomi:"しゃく", q:"★熱の太陽が照りつける", h1:"ひへん+「勺」だよ。", h2:"火で焼く=灼熱の灼。7画だよ。" },
+    { k:"隼", yomi:"はやぶさ", q:"★は世界最速の鳥だ", h1:"「隹(ふるとり)」+「十」だよ。", h2:"矢のように速い鳥。新幹線の名前にもなったね。10画。" },
+  ]},
+  { id: "1", name: "1級", desc: "大学・一般(約6000字レベル)", items: [
+    { k:"蟹", yomi:"かに", q:"ゆでた★を食べる", h1:"「解」の下に「虫」があるよ。", h2:"体を解(バラ)して食べる虫(生きもの)=かに。19画。" },
+    { k:"鰻", yomi:"うなぎ", q:"土用の丑の日に★を食べる", h1:"うおへん+「曼」だよ。", h2:"細長い(曼)魚=うなぎ。22画だよ。" },
+    { k:"鴉", yomi:"からす", q:"★が夕空に鳴く", h1:"「牙」+「鳥」だよ。", h2:"ガーと鳴く(牙の音読みガ)鳥=からす。15画。" },
+    { k:"薔", yomi:"ばら(の薔)", q:"★薇(ばら)の花束をおくる", h1:"くさかんむり+「土」+「人人」+「回」だよ。", h2:"薔薇(ばら)の1文字目。16画だよ。" },
+    { k:"麒", yomi:"き", q:"★麟(きりん)は伝説の聖獣だ", h1:"「鹿」+「其」だよ。", h2:"麒麟(きりん)の1文字目。19画。" },
+    { k:"燦", yomi:"さん", q:"★々と輝く太陽", h1:"ひへん+「粲」だよ。", h2:"火が光りかがやくさま=燦然。17画。" },
+    { k:"檸", yomi:"ねい", q:"★檬(レモン)の香りがする", h1:"きへん+「寧」だよ。", h2:"檸檬(レモン)の1文字目。木へんの果物だよ。17画。" },
+    { k:"佇", yomi:"たたず(む)", q:"夕日の中に★む人かげ", h1:"にんべん+「宁」だよ。", h2:"人がじっと立ち止まる=たたずむ。7画。" },
+  ]},
+];
+
+/* ==================================================================
+   状態
+================================================================== */
+const state = {
+  level: null,        // LEVELS の要素
+  qIndex: 0,          // 出題中の問題番号
+  order: [],          // シャッフルした出題順
+  hintLevel: 0,       // 0〜4
+  refStrokes: null,   // お手本ストローク [[{x,y},...], ...] (109座標系)
+  userStrokes: [],    // ユーザーのストローク [[{x,y,p},...], ...] (109座標系)
+  drawing: false,
+  currentStroke: null,
+  animTimer: null,
+  checked: false,
+};
+
+const VG = 109; // KanjiVG の viewBox サイズ
+const SAMPLE_N = 24; // 1画あたりの比較サンプル点数
+
+/* ==================================================================
+   KanjiVG 読み込み(CDN + localStorage キャッシュ)
+================================================================== */
+const VG_SOURCES = [
+  ch => `https://cdn.jsdelivr.net/gh/KanjiVG/kanjivg@master/kanji/${hex5(ch)}.svg`,
+  ch => `https://raw.githubusercontent.com/KanjiVG/kanjivg/master/kanji/${hex5(ch)}.svg`,
+];
+function hex5(ch) { return ch.codePointAt(0).toString(16).padStart(5, "0"); }
+
+async function fetchKanjiSVG(ch) {
+  const key = "kvg_" + hex5(ch);
+  const cached = localStorage.getItem(key);
+  if (cached) return cached;
+  for (const src of VG_SOURCES) {
+    try {
+      const res = await fetch(src(ch));
+      if (res.ok) {
+        const text = await res.text();
+        try { localStorage.setItem(key, text); } catch (e) { /* 容量オーバーは無視 */ }
+        return text;
+      }
+    } catch (e) { /* 次のソースへ */ }
+  }
+  return null;
+}
+
+// SVG パス → 点列にサンプリング
+const hiddenSVG = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+hiddenSVG.style.cssText = "position:absolute;width:0;height:0;overflow:hidden;";
+document.body.appendChild(hiddenSVG);
+
+function svgToStrokes(svgText) {
+  const doc = new DOMParser().parseFromString(svgText, "image/svg+xml");
+  const paths = [...doc.querySelectorAll("path")];
+  return paths.map(p => {
+    const el = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    el.setAttribute("d", p.getAttribute("d"));
+    hiddenSVG.appendChild(el);
+    const len = el.getTotalLength();
+    const pts = [];
+    for (let i = 0; i <= SAMPLE_N * 2; i++) {
+      const pt = el.getPointAtLength(len * i / (SAMPLE_N * 2));
+      pts.push({ x: pt.x, y: pt.y });
+    }
+    hiddenSVG.removeChild(el);
+    return pts;
+  });
+}
+
+/* ==================================================================
+   幾何ユーティリティ
+================================================================== */
+function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+
+function strokeLength(pts) {
+  let l = 0;
+  for (let i = 1; i < pts.length; i++) l += dist(pts[i - 1], pts[i]);
+  return l;
+}
+
+// 弧長で等間隔に n 点へリサンプリング
+function resample(pts, n) {
+  if (pts.length === 1) return Array(n).fill(pts[0]);
+  const total = strokeLength(pts);
+  if (total === 0) return Array(n).fill(pts[0]);
+  const step = total / (n - 1);
+  const out = [pts[0]];
+  let acc = 0, i = 1, prev = pts[0];
+  while (out.length < n && i < pts.length) {
+    const d = dist(prev, pts[i]);
+    if (acc + d >= step) {
+      const t = (step - acc) / d;
+      const np = { x: prev.x + t * (pts[i].x - prev.x), y: prev.y + t * (pts[i].y - prev.y) };
+      out.push(np); prev = np; acc = 0;
+    } else { acc += d; prev = pts[i]; i++; }
+  }
+  while (out.length < n) out.push(pts[pts.length - 1]);
+  return out;
+}
+
+// 全ストロークをまとめて 0..100 の箱に正規化(アスペクト比維持・中央寄せ)
+function normalizeAll(strokes) {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const s of strokes) for (const p of s) {
+    minX = Math.min(minX, p.x); minY = Math.min(minY, p.y);
+    maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y);
+  }
+  const w = Math.max(maxX - minX, 1), h = Math.max(maxY - minY, 1);
+  const scale = 100 / Math.max(w, h);
+  const ox = (100 - w * scale) / 2, oy = (100 - h * scale) / 2;
+  return strokes.map(s => s.map(p => ({
+    x: (p.x - minX) * scale + ox,
+    y: (p.y - minY) * scale + oy,
+  })));
+}
+
+// 2つのリサンプル済みストローク間の平均距離
+function strokeDist(a, b) {
+  let sum = 0;
+  for (let i = 0; i < a.length; i++) sum += dist(a[i], b[i]);
+  return sum / a.length;
+}
+
+/* ==================================================================
+   採点:文字が合っているか・書き順が正しいか
+================================================================== */
+function gradeAnswer() {
+  const ref = state.refStrokes, user = state.userStrokes;
+  if (user.length === 0) return { type: "empty" };
+  if (user.length !== ref.length) {
+    return { type: "count", refCount: ref.length, userCount: user.length };
+  }
+  const n = ref.length;
+  const refN = normalizeAll(ref).map(s => resample(s, SAMPLE_N));
+  const userN = normalizeAll(user).map(s => resample(s, SAMPLE_N));
+
+  // コスト行列(正方向・逆方向)
+  const cost = [], costRev = [];
+  for (let u = 0; u < n; u++) {
+    cost[u] = []; costRev[u] = [];
+    for (let r = 0; r < n; r++) {
+      cost[u][r] = strokeDist(userN[u], refN[r]);
+      costRev[u][r] = strokeDist([...userN[u]].reverse(), refN[r]);
+    }
+  }
+  // 貪欲マッチング(画数は少ないので十分)
+  const pairs = [];
+  for (let u = 0; u < n; u++) for (let r = 0; r < n; r++) {
+    pairs.push({ u, r, c: Math.min(cost[u][r], costRev[u][r]) });
+  }
+  pairs.sort((a, b) => a.c - b.c);
+  const uUsed = Array(n).fill(false), rUsed = Array(n).fill(false);
+  const assign = Array(n).fill(-1); // assign[u] = r
+  for (const p of pairs) {
+    if (!uUsed[p.u] && !rUsed[p.r]) {
+      uUsed[p.u] = true; rUsed[p.r] = true; assign[p.u] = p.r;
+    }
+  }
+
+  const THRESH = 26;
+  const costs = assign.map((r, u) => Math.min(cost[u][r], costRev[u][r]));
+  const avg = costs.reduce((a, b) => a + b, 0) / n;
+  const allMatched = costs.every(c => c < THRESH + 6) && avg < THRESH - 4;
+  if (!allMatched) {
+    const matched = costs.filter(c => c < THRESH).length;
+    return { type: "wrong", matched, total: n };
+  }
+
+  // 書き順チェック:assign が恒等写像なら正しい順
+  const orderOK = assign.every((r, u) => r === u);
+  // 筆の方向チェック
+  const revStrokes = [];
+  for (let u = 0; u < n; u++) {
+    const r = assign[u];
+    if (costRev[u][r] + 3 < cost[u][r]) revStrokes.push(r + 1);
+  }
+  return { type: "correct", orderOK, assign, revStrokes, avg };
+}
+
+/* ==================================================================
+   きれいに書くコツの生成
+================================================================== */
+function strokeType(pts) {
+  const a = pts[0], b = pts[pts.length - 1];
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const len = Math.hypot(dx, dy);
+  const total = strokeLength(pts);
+  if (total < 8) return "dot";
+  if (Math.abs(dy) < Math.abs(dx) * 0.35 && dx > 0) return "yoko";
+  if (Math.abs(dx) < Math.abs(dy) * 0.35 && dy > 0) return "tate";
+  if (dx < 0 && dy > 0) return "hidariharai";
+  if (dx > 0 && dy > 0) return (total > len * 1.15) ? "migiharai" : "migishita";
+  return "other";
+}
+
+const TYPE_TIPS = {
+  yoko: "横画(よこぼう)は、ほんの少し右上がりに書くと字が生き生きします。",
+  tate: "縦画(たてぼう)は、まっすぐおろして最後をしっかり「とめ」ましょう。",
+  hidariharai: "左はらいは、だんだん力をぬいて「すうっ」と細く抜きましょう。",
+  migiharai: "右はらいは、いったん少し力を入れてから「はらう」と形がきまります。",
+  dot: "点は、ちょんと置くだけでなく打つ方向を意識すると引きしまります。",
+};
+
+function beautyTips(result) {
+  const tips = [];
+  const types = new Set(state.refStrokes.map(strokeType));
+  for (const t of ["yoko", "tate", "hidariharai", "migiharai", "dot"]) {
+    if (types.has(t) && tips.length < 3) tips.push(TYPE_TIPS[t]);
+  }
+  // ユーザーの字の大きさ・位置チェック
+  if (state.userStrokes.length > 0) {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const s of state.userStrokes) for (const p of s) {
+      minX = Math.min(minX, p.x); minY = Math.min(minY, p.y);
+      maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y);
+    }
+    const w = maxX - minX, h = maxY - minY;
+    if (Math.max(w, h) < VG * 0.5) {
+      tips.unshift("マスいっぱいに大きく堂々と書くと、バランスの練習になりますよ。");
+    } else {
+      const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+      if (Math.abs(cx - VG / 2) > VG * 0.13 || Math.abs(cy - VG / 2) > VG * 0.13) {
+        tips.unshift("字がマスの中心から少しずれています。十字ガイドの交わる所に字の中心を合わせましょう。");
+      }
+    }
+  }
+  tips.push("画と画のすき間を同じくらいにそろえると、ぐっと整った字になります。");
+  return tips.slice(0, 4);
+}
+
+/* ==================================================================
+   進捗(localStorage)
+================================================================== */
+function progKey(levelId) { return "kanji_prog_" + levelId; }
+function getProgress(levelId) {
+  try { return JSON.parse(localStorage.getItem(progKey(levelId))) || []; }
+  catch (e) { return []; }
+}
+function markDone(levelId, kanji) {
+  const p = getProgress(levelId);
+  if (!p.includes(kanji)) { p.push(kanji); localStorage.setItem(progKey(levelId), JSON.stringify(p)); }
+}
+
+/* ==================================================================
+   画面: 級選択
+================================================================== */
+const $ = id => document.getElementById(id);
+
+function renderLevelGrid() {
+  const grid = $("levelGrid");
+  grid.innerHTML = "";
+  for (const lv of LEVELS) {
+    const done = getProgress(lv.id).length;
+    const card = document.createElement("div");
+    card.className = "level-card";
+    card.innerHTML = `
+      <div class="lv">${lv.name}</div>
+      <div class="desc">${lv.desc}</div>
+      <div class="prog">${done > 0 ? `💮 ${done} / ${lv.items.length} 字クリア` : `全 ${lv.items.length} 字`}</div>`;
+    card.addEventListener("click", () => startLevel(lv));
+    grid.appendChild(card);
+  }
+}
+
+function showScreen(id) {
+  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+  $(id).classList.add("active");
+}
+
+/* ==================================================================
+   画面: 練習
+================================================================== */
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function startLevel(lv) {
+  state.level = lv;
+  state.order = shuffle(lv.items.map((_, i) => i));
+  state.qIndex = 0;
+  showScreen("screen-practice");
+  setupCanvas();
+  loadQuestion();
+}
+
+function currentItem() {
+  return state.level.items[state.order[state.qIndex % state.order.length]];
+}
+
+async function loadQuestion() {
+  stopAnim();
+  state.hintLevel = 0;
+  state.userStrokes = [];
+  state.refStrokes = null;
+  state.checked = false;
+  $("hintBox").style.display = "none";
+  $("hintList").innerHTML = "";
+  $("resultBox").style.display = "none";
+  $("btnHint").disabled = false;
+  $("btnCheck").disabled = true;
+  $("loadingMsg").style.display = "block";
+
+  const item = currentItem();
+  const lv = state.level;
+  $("progressLabel").textContent = `${lv.name} 第${state.qIndex + 1}問 (💮 ${getProgress(lv.id).length}/${lv.items.length})`;
+  const parts = item.q.split("★");
+  $("questionSentence").innerHTML =
+    `${esc(parts[0])}<span class="blank">${esc(item.yomi)}</span>${esc(parts[1] || "")}`;
+  redraw();
+
+  const svg = await fetchKanjiSVG(item.k);
+  $("loadingMsg").style.display = "none";
+  if (!svg) {
+    showResult("ng", "データを読みこめません", "この漢字の書き順データを取得できませんでした。インターネットにつないでから「つぎの問題」を押してもう一度ためしてください。", null, null);
+    return;
+  }
+  state.refStrokes = svgToStrokes(svg);
+  $("btnCheck").disabled = false;
+}
+
+function esc(s) {
+  return s.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+/* ==================================================================
+   キャンバス
+================================================================== */
+const canvas = $("drawCanvas");
+const ctx = canvas.getContext("2d");
+let cssSize = 400;
+
+function setupCanvas() {
+  cssSize = Math.min(window.innerWidth - 60, window.innerHeight - 300, 520);
+  cssSize = Math.max(cssSize, 260);
+  const dpr = window.devicePixelRatio || 1;
+  canvas.style.width = canvas.style.height = cssSize + "px";
+  canvas.width = canvas.height = Math.round(cssSize * dpr);
+  ctx.setTransform(dpr * cssSize / VG, 0, 0, dpr * cssSize / VG, 0, 0); // 以後 109 座標系で描画
+  redraw();
+}
+window.addEventListener("resize", () => { if ($("screen-practice").classList.contains("active")) setupCanvas(); });
+
+function toModel(e) {
+  const rect = canvas.getBoundingClientRect();
+  return {
+    x: (e.clientX - rect.left) / rect.width * VG,
+    y: (e.clientY - rect.top) / rect.height * VG,
+    p: e.pressure || 0.5,
+  };
+}
+
+canvas.addEventListener("pointerdown", e => {
+  if ($("penOnly").checked && e.pointerType === "touch") return;
+  e.preventDefault();
+  canvas.setPointerCapture(e.pointerId);
+  state.drawing = true;
+  state.currentStroke = [toModel(e)];
+});
+canvas.addEventListener("pointermove", e => {
+  if (!state.drawing) return;
+  e.preventDefault();
+  const events = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+  for (const ev of events) {
+    const pt = toModel(ev);
+    const last = state.currentStroke[state.currentStroke.length - 1];
+    if (dist(pt, last) < 0.7) continue;
+    state.currentStroke.push(pt);
+    drawSegment(last, pt);
+  }
+});
+function endStroke(e) {
+  if (!state.drawing) return;
+  state.drawing = false;
+  if (state.currentStroke && state.currentStroke.length >= 1) {
+    state.userStrokes.push(state.currentStroke);
+  }
+  state.currentStroke = null;
+  redraw();
+}
+canvas.addEventListener("pointerup", endStroke);
+canvas.addEventListener("pointercancel", endStroke);
+
+function penWidth(p) { return 2.2 + p * 3.2; }
+
+function drawSegment(a, b) {
+  ctx.strokeStyle = "#222";
+  ctx.lineCap = "round"; ctx.lineJoin = "round";
+  ctx.lineWidth = penWidth((a.p + b.p) / 2);
+  ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+}
+
+function drawStroke(pts, color, width) {
+  if (pts.length === 0) return;
+  ctx.strokeStyle = color;
+  ctx.lineCap = "round"; ctx.lineJoin = "round";
+  ctx.lineWidth = width;
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, pts[0].y);
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+  if (pts.length === 1) ctx.lineTo(pts[0].x + 0.01, pts[0].y);
+  ctx.stroke();
+}
+
+function redraw() {
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.restore();
+  // 十字ガイド
+  ctx.strokeStyle = "#e8d9c0"; ctx.lineWidth = 0.8;
+  ctx.setLineDash([3, 3]);
+  ctx.beginPath();
+  ctx.moveTo(VG / 2, 2); ctx.lineTo(VG / 2, VG - 2);
+  ctx.moveTo(2, VG / 2); ctx.lineTo(VG - 2, VG / 2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  // ヒント3: うすいお手本
+  if (state.hintLevel >= 3 && state.refStrokes) {
+    for (const s of state.refStrokes) drawStroke(s, "rgba(180,160,130,0.35)", 4.5);
+  }
+  // ユーザーの筆跡
+  for (const s of state.userStrokes) {
+    for (let i = 1; i < s.length; i++) drawSegment(s[i - 1], s[i]);
+    if (s.length === 1) drawSegment(s[0], { x: s[0].x + 0.01, y: s[0].y, p: s[0].p });
+  }
+}
+
+/* ==================================================================
+   ヒント
+================================================================== */
+const HINT_LABELS = ["💡 ヒント", "💡 ヒント②", "💡 ヒント③", "💡 ヒント④(こたえに近い!)", "💡 ヒントはこれで全部"];
+
+function showHint() {
+  if (!state.refStrokes) return;
+  if (state.hintLevel >= 4) return;
+  state.hintLevel++;
+  const item = currentItem();
+  const list = $("hintList");
+  const div = document.createElement("div");
+  div.className = "hint-item";
+  switch (state.hintLevel) {
+    case 1:
+      div.textContent = `ヒント①:この漢字は ${state.refStrokes.length}画 だよ。${item.h1}`;
+      break;
+    case 2:
+      div.textContent = `ヒント②:${item.h2}`;
+      break;
+    case 3:
+      div.textContent = "ヒント③:マスにうすくお手本を出したよ。なぞって書いてみよう!";
+      redraw();
+      break;
+    case 4:
+      div.textContent = "ヒント④:正しい書き順のアニメーションを見せるね。よく見ておぼえてから、自分で書いてみよう!";
+      animateOnCanvas();
+      break;
+  }
+  list.appendChild(div);
+  $("hintBox").style.display = "block";
+  $("btnHint").textContent = HINT_LABELS[state.hintLevel];
+  if (state.hintLevel >= 4) $("btnHint").disabled = true;
+}
+
+// ヒント4: メインキャンバス上で書き順アニメーション
+function animateOnCanvas() {
+  stopAnim();
+  const strokes = state.refStrokes.map(s => resample(s, 40));
+  let si = 0, pi = 0;
+  redraw();
+  function step() {
+    if (si >= strokes.length) { state.animTimer = null; return; }
+    // これまでの画を描画
+    redraw();
+    for (let k = 0; k < si; k++) drawStroke(strokes[k], "rgba(200,80,60,0.75)", 4);
+    drawStroke(strokes[si].slice(0, pi + 1), "rgba(200,80,60,0.9)", 4.5);
+    // 画番号
+    ctx.fillStyle = "#b5432a";
+    ctx.font = "bold 8px sans-serif";
+    for (let k = 0; k <= si; k++) {
+      ctx.fillText(String(k + 1), strokes[k][0].x - 3, strokes[k][0].y - 2);
+    }
+    pi += 3;
+    if (pi >= strokes[si].length) { si++; pi = 0; }
+    state.animTimer = setTimeout(step, si >= strokes.length ? 1200 : 33);
+    if (si >= strokes.length) {
+      // 最後に少し表示してから消す
+      state.animTimer = setTimeout(() => { redraw(); state.animTimer = null; }, 1600);
+    }
+  }
+  step();
+}
+
+function stopAnim() {
+  if (state.animTimer) { clearTimeout(state.animTimer); state.animTimer = null; }
+}
+
+/* ==================================================================
+   こたえあわせ
+================================================================== */
+function check() {
+  if (!state.refStrokes) return;
+  stopAnim();
+  const item = currentItem();
+  const result = gradeAnswer();
+
+  if (result.type === "empty") {
+    showResult("warn", "まだ書いていないよ", "マスの中に漢字を書いてから「こたえあわせ」を押してね。", null, null);
+    return;
+  }
+
+  state.checked = true;
+
+  if (result.type === "correct") {
+    markDone(state.level.id, item.k);
+    const tips = beautyTips(result);
+    if (result.orderOK && result.revStrokes.length === 0) {
+      showStamp("💮");
+      showResult("ok",
+        `◎ 大正解!「${item.k}」`,
+        `文字も書き順もバッチリ!すばらしい!お手本とくらべて、形もたしかめてみよう。`,
+        null, tips, item.k);
+    } else {
+      showStamp("⭕");
+      let orderMsg;
+      if (!result.orderOK) {
+        const wrongList = describeOrderMistake(result.assign);
+        orderMsg = `文字は合っているので正解!でも書き順がちがうよ。${wrongList} 下のお手本で、番号のじゅんに書く様子をよく見てね。`;
+      } else {
+        orderMsg = `文字は合っているので正解!でも ${result.revStrokes.join("・")}画目の筆の向きが逆だよ。書く方向も下のお手本でたしかめてね。`;
+      }
+      showResult("warn", `○ 正解!でも書き順に注意「${item.k}」`, orderMsg, true, tips, item.k);
+    }
+  } else if (result.type === "count") {
+    showResult("ng",
+      "ざんねん、画数がちがうよ",
+      `この漢字は ${result.refCount}画 だけど、${result.userCount}画 で書いているよ。下のお手本を見て、「全部けす」で消してもう一度チャレンジ!`,
+      null, null, item.k);
+  } else {
+    showResult("ng",
+      "ざんねん、もう一度!",
+      `${result.matched > 0 ? `${result.total}画のうち ${result.matched}画は合っていそうだよ。おしい!` : "形がまだ合っていないみたい。"}正しい漢字は下のお手本だよ。「全部けす」で消して、お手本を見ながらもう一度書いてみよう。`,
+      null, null, item.k);
+  }
+}
+
+// 書き順のまちがいを言葉で説明
+function describeOrderMistake(assign) {
+  // assign[u] = r : u番目に書いた画は、本当は r+1 画目
+  for (let u = 0; u < assign.length; u++) {
+    if (assign[u] !== u) {
+      return `たとえば、あなたが ${u + 1}番目 に書いた画は、本当は ${assign[u] + 1}画目 に書く画だよ。`;
+    }
+  }
+  return "";
+}
+
+function showResult(kind, title, message, showOrder, tips, modelChar) {
+  const box = $("resultBox");
+  box.className = "result-box " + kind;
+  let html = `<h3>${esc(title)}</h3><p>${esc(message)}</p>`;
+  if (modelChar) {
+    html += `<div class="model-box"><h4>📖 お手本(きれいな字)</h4>
+      <div class="model-kanji">${esc(modelChar)}</div></div>`;
+  }
+  if (showOrder) {
+    html += `<div class="order-box"><h4>✍️ 正しい書き順(番号のじゅんに)</h4>
+      <canvas id="refCanvas" width="440" height="440"></canvas>
+      <button class="btn btn-ghost" id="btnReplay" style="display:block;margin:4px auto;">▶ もう一度再生</button></div>`;
+  }
+  if (tips) {
+    html += `<div class="tips"><h4>✨ きれいに書くコツ</h4><ul>` +
+      tips.map(t => `<li>${esc(t)}</li>`).join("") + `</ul></div>`;
+  }
+  box.innerHTML = html;
+  box.style.display = "block";
+  if (showOrder) {
+    animateReference();
+    $("btnReplay").addEventListener("click", animateReference);
+  }
+  box.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+// 結果ボックス内のお手本アニメーション(番号つき・ゆっくり)
+let refAnimTimer = null;
+function animateReference() {
+  const rc = $("refCanvas");
+  if (!rc || !state.refStrokes) return;
+  if (refAnimTimer) { clearTimeout(refAnimTimer); refAnimTimer = null; }
+  const rctx = rc.getContext("2d");
+  const scale = rc.width / VG;
+  const strokes = state.refStrokes.map(s => resample(s, 40));
+  let si = 0, pi = 0;
+
+  function drawBase() {
+    rctx.setTransform(1, 0, 0, 1, 0, 0);
+    rctx.clearRect(0, 0, rc.width, rc.height);
+    rctx.setTransform(scale, 0, 0, scale, 0, 0);
+    // ガイド
+    rctx.strokeStyle = "#eee"; rctx.lineWidth = 0.8; rctx.setLineDash([3, 3]);
+    rctx.beginPath();
+    rctx.moveTo(VG / 2, 0); rctx.lineTo(VG / 2, VG);
+    rctx.moveTo(0, VG / 2); rctx.lineTo(VG, VG / 2);
+    rctx.stroke(); rctx.setLineDash([]);
+    // 全体をうすく
+    for (const s of strokes) drawOn(rctx, s, "rgba(0,0,0,0.12)", 4);
+  }
+  function drawOn(c, pts, color, width) {
+    c.strokeStyle = color; c.lineCap = "round"; c.lineJoin = "round"; c.lineWidth = width;
+    c.beginPath(); c.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < pts.length; i++) c.lineTo(pts[i].x, pts[i].y);
+    c.stroke();
+  }
+  function step() {
+    drawBase();
+    for (let k = 0; k < si; k++) drawOn(rctx, strokes[k], "#b5432a", 4.5);
+    if (si < strokes.length) drawOn(rctx, strokes[si].slice(0, pi + 1), "#d9534f", 5);
+    // 番号
+    rctx.fillStyle = "#1a6fb5"; rctx.font = "bold 9px sans-serif";
+    const upto = Math.min(si + 1, strokes.length);
+    for (let k = 0; k < upto; k++) {
+      rctx.fillText(String(k + 1), strokes[k][0].x - 4, strokes[k][0].y - 2);
+    }
+    if (si >= strokes.length) { refAnimTimer = null; return; }
+    pi += 2;
+    if (pi >= strokes[si].length) { si++; pi = 0; refAnimTimer = setTimeout(step, 350); }
+    else refAnimTimer = setTimeout(step, 30);
+  }
+  step();
+}
+
+function showStamp(emoji) {
+  const st = $("stamp");
+  st.textContent = emoji;
+  st.classList.remove("show");
+  void st.offsetWidth; // アニメーション再スタート
+  st.classList.add("show");
+}
+
+/* ==================================================================
+   ボタン
+================================================================== */
+$("btnBack").addEventListener("click", () => { stopAnim(); renderLevelGrid(); showScreen("screen-level"); });
+$("btnNext").addEventListener("click", () => {
+  state.qIndex++;
+  $("btnHint").textContent = HINT_LABELS[0];
+  loadQuestion();
+});
+$("btnUndo").addEventListener("click", () => { state.userStrokes.pop(); redraw(); });
+$("btnClear").addEventListener("click", () => { state.userStrokes = []; redraw(); });
+$("btnHint").addEventListener("click", showHint);
+$("btnCheck").addEventListener("click", check);
+
+// スクロール抑止(キャンバス上)
+document.body.addEventListener("touchmove", e => {
+  if (state.drawing) e.preventDefault();
+}, { passive: false });
+
+/* ==================================================================
+   初期化
+================================================================== */
+renderLevelGrid();
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("sw.js").catch(() => {});
+}
+</script>
+</body>
+</html>
