@@ -311,10 +311,14 @@ const LEVELS = [
 /* ==================================================================
    状態
 ================================================================== */
+const CORRECT_TO_ADVANCE = 10;
+
 const state = {
   level: null,        // LEVELS の要素
   qIndex: 0,          // 出題中の問題番号
   order: [],          // シャッフルした出題順
+  correctCount: 0,    // この級での正解数
+  levelCleared: false,// 10問正解して次の級へ進める状態
   hintLevel: 0,       // 0〜4
   refStrokes: null,   // お手本ストローク [[{x,y},...], ...] (109座標系)
   userStrokes: [],    // ユーザーのストローク [[{x,y,p},...], ...] (109座標系)
@@ -588,10 +592,45 @@ function shuffle(arr) {
   return a;
 }
 
+function getNextLevel(lv) {
+  const i = LEVELS.findIndex(l => l.id === lv.id);
+  return i >= 0 && i < LEVELS.length - 1 ? LEVELS[i + 1] : null;
+}
+
+function updateProgressLabel() {
+  const lv = state.level;
+  if (!lv) return;
+  $("progressLabel").textContent =
+    `${lv.name} 正解 ${state.correctCount}/${CORRECT_TO_ADVANCE}問 (第${state.qIndex + 1}問)`;
+}
+
+function setNextButtonForLevel() {
+  if (!state.levelCleared) {
+    $("btnNext").textContent = "つぎの問題 ▶";
+    return;
+  }
+  const next = getNextLevel(state.level);
+  $("btnNext").textContent = next ? `次の級(${next.name})へ ▶` : "級選択へ ▶";
+}
+
+function advanceToNextLevel() {
+  const next = getNextLevel(state.level);
+  state.levelCleared = false;
+  if (next) {
+    startLevel(next);
+    return;
+  }
+  renderLevelGrid();
+  showScreen("screen-level");
+}
+
 function startLevel(lv) {
   state.level = lv;
   state.order = shuffle(lv.items.map((_, i) => i));
   state.qIndex = 0;
+  state.correctCount = 0;
+  state.levelCleared = false;
+  $("btnNext").textContent = "つぎの問題 ▶";
   showScreen("screen-practice");
   setupCanvas();
   loadQuestion();
@@ -615,8 +654,7 @@ async function loadQuestion() {
   $("loadingMsg").style.display = "block";
 
   const item = currentItem();
-  const lv = state.level;
-  $("progressLabel").textContent = `${lv.name} 第${state.qIndex + 1}問 (💮 ${getProgress(lv.id).length}/${lv.items.length})`;
+  updateProgressLabel();
   const parts = item.q.split("★");
   $("questionSentence").innerHTML =
     `${esc(parts[0])}<span class="blank">${esc(item.yomi)}</span>${esc(parts[1] || "")}`;
@@ -825,15 +863,28 @@ function check() {
 
   if (result.type === "correct") {
     markDone(state.level.id, item.k);
+    state.correctCount++;
+    updateProgressLabel();
     const tips = beautyTips(result);
+    const nextLv = getNextLevel(state.level);
+    const levelUpMsg = state.correctCount >= CORRECT_TO_ADVANCE
+      ? (nextLv
+        ? `\n\n🎉 ${CORRECT_TO_ADVANCE}問正解! ${state.level.name}クリア!「次の級(${nextLv.name})へ ▶」を押すと進みます。`
+        : `\n\n🎉 ${CORRECT_TO_ADVANCE}問正解! ぜんぶの級をクリアしたよ!「級選択へ ▶」で戻れます。`)
+      : "";
+    if (state.correctCount >= CORRECT_TO_ADVANCE) {
+      state.levelCleared = true;
+      setNextButtonForLevel();
+      showStamp("🎉");
+    }
     if (result.orderOK && result.revStrokes.length === 0) {
-      showStamp("💮");
+      if (state.correctCount < CORRECT_TO_ADVANCE) showStamp("💮");
       showResult("ok",
         `◎ 大正解!「${item.k}」`,
-        `文字も書き順もバッチリ!すばらしい!お手本とくらべて、形もたしかめてみよう。`,
+        `文字も書き順もバッチリ!すばらしい!お手本とくらべて、形もたしかめてみよう。${levelUpMsg}`,
         null, tips, item.k);
     } else {
-      showStamp("⭕");
+      if (state.correctCount < CORRECT_TO_ADVANCE) showStamp("⭕");
       let orderMsg;
       if (!result.orderOK) {
         const wrongList = describeOrderMistake(result.assign);
@@ -841,7 +892,7 @@ function check() {
       } else {
         orderMsg = `文字は合っているので正解!でも ${result.revStrokes.join("・")}画目の筆の向きが逆だよ。書く方向も下のお手本でたしかめてね。`;
       }
-      showResult("warn", `○ 正解!でも書き順に注意「${item.k}」`, orderMsg, true, tips, item.k);
+      showResult("warn", `○ 正解!でも書き順に注意「${item.k}」`, orderMsg + levelUpMsg, true, tips, item.k);
     }
   } else if (result.type === "count") {
     showResult("ng",
@@ -954,6 +1005,10 @@ function showStamp(emoji) {
 ================================================================== */
 $("btnBack").addEventListener("click", () => { stopAnim(); renderLevelGrid(); showScreen("screen-level"); });
 $("btnNext").addEventListener("click", () => {
+  if (state.levelCleared) {
+    advanceToNextLevel();
+    return;
+  }
   state.qIndex++;
   $("btnHint").textContent = HINT_LABELS[0];
   loadQuestion();
