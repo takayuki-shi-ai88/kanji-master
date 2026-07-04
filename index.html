@@ -77,7 +77,8 @@
 
   /* ===== 練習画面 ===== */
   .practice-wrap { max-width: 1100px; margin: 0 auto; }
-  .top-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; flex-wrap: wrap; gap: 8px; }
+  .top-bar { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 10px; flex-wrap: wrap; gap: 8px; }
+  .top-bar-left { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex: 1 1 auto; min-width: 0; }
   .btn {
     border: none; border-radius: 14px; padding: 12px 20px; font-size: 1.05rem;
     font-family: inherit; font-weight: bold; cursor: pointer;
@@ -114,45 +115,30 @@
   .canvas-tools { display: flex; gap: 10px; justify-content: center; margin-top: 10px; flex-wrap: wrap; }
   .answer-actions {
     display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;
-    width: 100%; margin-top: 4px;
+    width: 100%; margin: 0 0 12px;
   }
   .answer-actions .btn { flex: 1 1 150px; max-width: 220px; }
   .pen-toggle { font-size: .85rem; color: #8a6d55; margin-top: 8px; }
 
-  /* iPhone Safari 下部ツールバー（戻る・進む・共有）と重ならないよう余白を確保 */
   @media (max-width: 768px) {
     #screen-practice.active {
-      padding-bottom: calc(150px + env(safe-area-inset-bottom, 0px));
+      padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
     }
     .answer-actions {
-      position: fixed;
-      left: 0; right: 0;
-      bottom: calc(56px + env(safe-area-inset-bottom, 0px));
-      z-index: 40;
-      margin: 0;
-      padding: 10px 14px;
-      background: rgba(255, 248, 235, 0.97);
-      border-top: 2px solid #e8d9c0;
-      box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.1);
+      margin-bottom: 10px;
       gap: 8px;
     }
     .answer-actions .btn {
       flex: 1 1 0;
       max-width: none;
-      min-height: 48px;
-      padding: 12px 10px;
-      font-size: 1rem;
+      min-height: 46px;
+      padding: 11px 8px;
+      font-size: .98rem;
     }
-    .answer-actions .btn-check { font-size: 1.05rem; }
-    .canvas-col {
-      padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
-    }
-    .app-badge {
-      bottom: calc(118px + env(safe-area-inset-bottom, 0px));
-      right: 8px;
-      font-size: .62rem;
-      padding: 4px 8px;
-    }
+    .answer-actions .btn-check { font-size: 1.02rem; }
+    .top-bar-left { align-items: flex-start; }
+    .app-badge { font-size: .58rem; padding: 4px 7px; line-height: 1.35; white-space: normal; }
+    .progress-label { font-size: .88rem; text-align: right; }
   }
 
   .side-col { flex: 1; min-width: 300px; max-width: 460px; display: flex; flex-direction: column; gap: 12px; }
@@ -187,13 +173,14 @@
   }
 
   .app-badge {
-    position: fixed; right: 10px; bottom: 10px; z-index: 100;
-    font-size: .72rem; color: #8a6d55;
-    text-align: right; line-height: 1.5; pointer-events: none;
+    font-size: .68rem; color: #8a6d55;
+    text-align: left; line-height: 1.4; pointer-events: none;
     user-select: none; -webkit-user-select: none;
-    background: rgba(255, 252, 245, .92); padding: 6px 10px;
+    background: rgba(255, 252, 245, .95); padding: 5px 8px;
     border-radius: 8px; border: 1px solid #e8d9c0;
+    white-space: nowrap;
   }
+  .app-badge-level { text-align: center; margin: 0 auto 12px; display: inline-block; }
   .app-badge strong { font-weight: bold; color: #b5432a; }
 </style>
 </head>
@@ -203,6 +190,9 @@
 <div id="screen-level" class="screen active">
   <h1 class="title">✏️ 漢字マスター</h1>
   <p class="subtitle">漢検チャレンジ 〜手やペンで書いておぼえよう〜<br>各級10字・<strong>10問正解</strong>でクリア!</p>
+  <div style="text-align:center;">
+    <div class="app-badge app-badge-level" id="appBadgeLevel" aria-label="バージョン情報"></div>
+  </div>
   <div class="nav-links">
     <button class="btn btn-ghost" id="btnFeedback">📮 みんなの意見箱</button>
   </div>
@@ -216,7 +206,10 @@
 <div id="screen-practice" class="screen">
   <div class="practice-wrap">
     <div class="top-bar">
-      <button class="btn btn-back" id="btnBack">← 級をえらぶ</button>
+      <div class="top-bar-left">
+        <button class="btn btn-back" id="btnBack">← 級をえらぶ</button>
+        <div class="app-badge" id="appBadge" aria-label="バージョン情報"></div>
+      </div>
       <span class="progress-label" id="progressLabel"></span>
     </div>
 
@@ -226,6 +219,11 @@
       <div class="jukugo-note" id="jukugoNote" style="display:none;"></div>
     </div>
 
+    <div class="answer-actions">
+      <button class="btn btn-check" id="btnCheck">✅ こたえあわせ</button>
+      <button class="btn btn-next" id="btnNext" disabled>つぎの問題 ▶</button>
+    </div>
+
     <div class="main-area">
       <div class="canvas-col">
         <canvas id="drawCanvas"></canvas>
@@ -233,10 +231,6 @@
           <button class="btn btn-undo" id="btnUndo">↩ 一画もどす</button>
           <button class="btn btn-clear" id="btnClear">🗑 全部けす</button>
           <button class="btn btn-hint" id="btnHint">💡 ヒント</button>
-        </div>
-        <div class="answer-actions">
-          <button class="btn btn-check" id="btnCheck">✅ こたえあわせ</button>
-          <button class="btn btn-next" id="btnNext" disabled>つぎの問題 ▶</button>
         </div>
         <div class="pen-toggle">
           <label><input type="radio" name="inputMode" id="inputHand" value="hand" checked> ✋ 手で書く</label>
@@ -278,13 +272,11 @@
 
 <div class="stamp" id="stamp">💮</div>
 
-<div class="app-badge" id="appBadge" aria-label="バージョン情報"></div>
-
 <script>
 "use strict";
 
 /* 更新のたびに更新日と連番を上げる */
-const APP_BUILD = { company: "AI 88 Heart", updated: "2026年7月4日", rev: 11 };
+const APP_BUILD = { company: "AI 88 Heart", updated: "2026年7月4日", rev: 12 };
 
 /* ==================================================================
    問題データ(漢検レベル別・代表的な漢字のサンプル)
@@ -899,8 +891,12 @@ const ctx = canvas.getContext("2d");
 let cssSize = 400;
 
 function setupCanvas() {
-  cssSize = Math.min(window.innerWidth - 60, window.innerHeight - 300, 520);
-  cssSize = Math.max(cssSize, 260);
+  const isMobile = window.innerWidth <= 768;
+  const heightReserve = isMobile ? 430 : 300;
+  const maxSize = isMobile ? 320 : 520;
+  const minSize = isMobile ? 210 : 260;
+  cssSize = Math.min(window.innerWidth - 48, window.innerHeight - heightReserve, maxSize);
+  cssSize = Math.max(cssSize, minSize);
   const dpr = window.devicePixelRatio || 1;
   canvas.style.width = canvas.style.height = cssSize + "px";
   canvas.width = canvas.height = Math.round(cssSize * dpr);
@@ -1255,8 +1251,9 @@ document.body.addEventListener("touchmove", e => {
 ================================================================== */
 renderLevelGrid();
 resetInputModeToHand();
-$("appBadge").innerHTML =
-  `作成 <strong>${APP_BUILD.company}</strong><br>更新 ${APP_BUILD.updated} · Ver${APP_BUILD.rev}`;
+const badgeHtml = `作成 <strong>${APP_BUILD.company}</strong><br>更新 ${APP_BUILD.updated} · Ver${APP_BUILD.rev}`;
+$("appBadge").innerHTML = badgeHtml;
+$("appBadgeLevel").innerHTML = badgeHtml;
 window.addEventListener("pageshow", resetInputModeToHand);
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").catch(() => {});
