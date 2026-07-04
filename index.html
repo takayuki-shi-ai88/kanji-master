@@ -157,7 +157,7 @@
 <!-- ============ 級選択画面 ============ -->
 <div id="screen-level" class="screen active">
   <h1 class="title">✏️ 漢字マスター</h1>
-  <p class="subtitle">漢検チャレンジ 〜タッチペンで書いておぼえよう〜<br>各級10字・<strong>10問正解</strong>でクリア!</p>
+  <p class="subtitle">漢検チャレンジ 〜手やペンで書いておぼえよう〜<br>各級10字・<strong>10問正解</strong>でクリア!</p>
   <div class="nav-links">
     <button class="btn btn-ghost" id="btnFeedback">📮 みんなの意見箱</button>
   </div>
@@ -191,9 +191,10 @@
           <button class="btn btn-hint" id="btnHint">💡 ヒント</button>
           <button class="btn btn-check" id="btnCheck">✅ こたえあわせ</button>
         </div>
-        <label class="pen-toggle">
-          <input type="checkbox" id="penOnly"> ペンだけで書く(指では書けない)
-        </label>
+        <div class="pen-toggle">
+          <label><input type="radio" name="inputMode" id="inputHand" value="hand" checked> ✋ 手で書く</label>
+          <label style="margin-left:12px;"><input type="radio" name="inputMode" id="inputPen" value="pen"> ✏️ ペンだけで書く</label>
+        </div>
       </div>
 
       <div class="side-col">
@@ -857,7 +858,7 @@ function toModel(e) {
 }
 
 canvas.addEventListener("pointerdown", e => {
-  if ($("penOnly").checked && e.pointerType === "touch") return;
+  if ($("inputPen").checked && e.pointerType === "touch") return;
   e.preventDefault();
   canvas.setPointerCapture(e.pointerId);
   state.drawing = true;
