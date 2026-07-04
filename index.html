@@ -1220,7 +1220,7 @@ document.body.addEventListener("touchmove", e => {
 renderLevelGrid();
 resetInputModeToHand();
 $("appBadge").innerHTML =
-  `作成 <strong>${APP_BUILD.company}</strong><br>更新 ${APP_BUILD.updated} · ${String(APP_BUILD.rev).padStart(2, "0")}`;
+  `作成 <strong>${APP_BUILD.company}</strong><br>更新 ${APP_BUILD.updated} · Ver${APP_BUILD.rev}`;
 window.addEventListener("pageshow", resetInputModeToHand);
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").catch(() => {});
