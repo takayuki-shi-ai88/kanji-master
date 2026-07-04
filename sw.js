@@ -1,6 +1,6 @@
 // 漢字マスター Service Worker
 // アプリ本体と KanjiVG の書き順データをキャッシュしてオフラインでも使えるようにする
-const CACHE = "kanji-master-v3";
+const CACHE = "kanji-master-v4";
 const APP_FILES = ["./", "./index.html", "./manifest.json", "./icon.svg", "./feedback.json"];
 
 self.addEventListener("install", e => {

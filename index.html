@@ -807,12 +807,18 @@ function advanceToNextLevel() {
   showScreen("screen-level");
 }
 
+function resetInputModeToHand() {
+  $("inputHand").checked = true;
+  $("inputPen").checked = false;
+}
+
 function startLevel(lv) {
   state.level = lv;
   state.order = shuffle(lv.items.map((_, i) => i));
   state.qIndex = 0;
   state.correctCount = 0;
   state.levelCleared = false;
+  resetInputModeToHand();
   $("btnNext").textContent = "つぎの問題 ▶";
   showScreen("screen-practice");
   setupCanvas();
@@ -1250,6 +1256,8 @@ document.body.addEventListener("touchmove", e => {
    初期化
 ================================================================== */
 renderLevelGrid();
+resetInputModeToHand();
+window.addEventListener("pageshow", resetInputModeToHand);
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").catch(() => {});
 }
