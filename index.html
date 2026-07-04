@@ -23,21 +23,8 @@
   #screen-practice.active {
     position: fixed; inset: 0; z-index: 1;
     overflow-y: auto; -webkit-overflow-scrolling: touch;
-    padding: 16px 52px 24px 16px;
+    padding: 16px 16px 24px;
   }
-
-  .scroll-rail {
-    position: fixed; right: 8px; top: 50%; transform: translateY(-50%);
-    display: none; flex-direction: column; gap: 10px; z-index: 60;
-  }
-  .scroll-rail.show { display: flex; }
-  .scroll-btn {
-    width: 44px; height: 44px; border: none; border-radius: 12px;
-    background: rgba(255,255,255,.95); color: #4a3728; font-size: 1.2rem;
-    box-shadow: 0 2px 8px rgba(0,0,0,.18); cursor: pointer;
-    border: 2px solid #e8b04b;
-  }
-  .scroll-btn:active { transform: scale(0.95); }
 
   /* ===== 級選択画面 ===== */
   h1.title {
@@ -125,6 +112,11 @@
     touch-action: none; display: block;
   }
   .canvas-tools { display: flex; gap: 10px; justify-content: center; margin-top: 10px; flex-wrap: wrap; }
+  .answer-actions {
+    display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;
+    width: 100%; margin-top: 4px;
+  }
+  .answer-actions .btn { flex: 1 1 150px; max-width: 220px; }
   .pen-toggle { font-size: .85rem; color: #8a6d55; margin-top: 8px; }
 
   .side-col { flex: 1; min-width: 300px; max-width: 460px; display: flex; flex-direction: column; gap: 12px; }
@@ -145,6 +137,7 @@
   .order-box h4 { color: #d9534f; margin-bottom: 6px; font-size: .95rem; }
   .model-box { background: #f2f6fb; border-radius: 10px; padding: 10px 14px; margin-bottom: 8px; text-align: center; }
   .model-box h4 { color: #1a6fb5; margin-bottom: 6px; font-size: .95rem; text-align: left; }
+  .model-box .order-title { color: #d9534f; margin-top: 12px; }
   .model-kanji {
     display: inline-block; width: 170px; height: 170px; line-height: 170px;
     font-size: 130px; text-align: center; color: #222;
@@ -155,7 +148,7 @@
       #fff;
     border: 2px solid #c9d8e8; border-radius: 10px;
   }
-  #refCanvas { background: #fff; border: 2px solid #d9c4a5; border-radius: 10px; display: block; margin: 8px auto; }
+  #refCanvas { background: #fff; border: 2px solid #d9c4a5; border-radius: 10px; display: block; margin: 8px auto; width: min(100%, 280px); height: auto; }
   .progress-label { font-weight: bold; color: #8a6d55; font-size: 1rem; }
   .loading-msg { text-align: center; color: #8a6d55; padding: 8px; font-size: .9rem; }
   .stamp {
@@ -192,7 +185,6 @@
     <div class="top-bar">
       <button class="btn btn-back" id="btnBack">← 級をえらぶ</button>
       <span class="progress-label" id="progressLabel"></span>
-      <button class="btn btn-next" id="btnNext">つぎの問題 ▶</button>
     </div>
 
     <div class="question-box">
@@ -208,7 +200,10 @@
           <button class="btn btn-undo" id="btnUndo">↩ 一画もどす</button>
           <button class="btn btn-clear" id="btnClear">🗑 全部けす</button>
           <button class="btn btn-hint" id="btnHint">💡 ヒント</button>
+        </div>
+        <div class="answer-actions">
           <button class="btn btn-check" id="btnCheck">✅ こたえあわせ</button>
+          <button class="btn btn-next" id="btnNext" disabled>つぎの問題 ▶</button>
         </div>
         <div class="pen-toggle">
           <label><input type="radio" name="inputMode" id="inputHand" value="hand" checked> ✋ 手で書く</label>
@@ -249,11 +244,6 @@
 </div>
 
 <div class="stamp" id="stamp">💮</div>
-
-<div class="scroll-rail" id="scrollRail" aria-hidden="true">
-  <button type="button" class="scroll-btn" id="scrollUp" aria-label="上にスクロール">▲</button>
-  <button type="button" class="scroll-btn" id="scrollDown" aria-label="下にスクロール">▼</button>
-</div>
 
 <script>
 "use strict";
@@ -752,12 +742,7 @@ function renderLevelGrid() {
 function showScreen(id) {
   document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
   $(id).classList.add("active");
-  $("scrollRail").classList.toggle("show", id === "screen-practice");
   if (id === "screen-practice") $("screen-practice").scrollTop = 0;
-}
-
-function practiceScrollStep() {
-  return Math.max(window.innerHeight * 0.55, 220);
 }
 
 /* ==================================================================
@@ -832,6 +817,7 @@ async function loadQuestion() {
   state.userStrokes = [];
   state.refStrokes = null;
   state.checked = false;
+  $("btnNext").disabled = true;
   $("hintBox").style.display = "none";
   $("hintList").innerHTML = "";
   $("resultBox").style.display = "none";
@@ -856,6 +842,7 @@ async function loadQuestion() {
   $("loadingMsg").style.display = "none";
   if (!svg) {
     showResult("ng", "データを読みこめません", "この漢字の書き順データを取得できませんでした。インターネットにつないでから「つぎの問題」を押してもう一度ためしてください。", null, null);
+    $("btnNext").disabled = false;
     return;
   }
   state.refStrokes = svgToStrokes(svg);
@@ -1078,7 +1065,7 @@ function check() {
       showResult("ok",
         `◎ 大正解!「${item.k}」`,
         `文字も書き順もバッチリ!すばらしい!お手本とくらべて、形もたしかめてみよう。${levelUpMsg}`,
-        null, tips, item.k);
+        tips, item.k);
     } else {
       if (state.correctCount < CORRECT_TO_ADVANCE) showStamp("⭕");
       let orderMsg;
@@ -1088,19 +1075,20 @@ function check() {
       } else {
         orderMsg = `文字は合っているので正解!でも ${result.revStrokes.join("・")}画目の筆の向きが逆だよ。書く方向も下のお手本でたしかめてね。`;
       }
-      showResult("warn", `○ 正解!でも書き順に注意「${item.k}」`, orderMsg + levelUpMsg, true, tips, item.k);
+      showResult("warn", `○ 正解!でも書き順に注意「${item.k}」`, orderMsg + levelUpMsg, tips, item.k);
     }
   } else if (result.type === "count") {
     showResult("ng",
       "ざんねん、画数がちがうよ",
       `この漢字は ${result.refCount}画 だけど、${result.userCount}画 で書いているよ。下のお手本を見て、「全部けす」で消してもう一度チャレンジ!`,
-      null, null, item.k);
+      null, item.k);
   } else {
     showResult("ng",
       "ざんねん、もう一度!",
       `${result.matched > 0 ? `${result.total}画のうち ${result.matched}画は合っていそうだよ。おしい!` : "形がまだ合っていないみたい。"}正しい漢字は下のお手本だよ。「全部けす」で消して、お手本を見ながらもう一度書いてみよう。`,
-      null, null, item.k);
+      null, item.k);
   }
+  $("btnNext").disabled = false;
 }
 
 // 書き順のまちがいを言葉で説明
@@ -1114,17 +1102,15 @@ function describeOrderMistake(assign) {
   return "";
 }
 
-function showResult(kind, title, message, showOrder, tips, modelChar) {
+function showResult(kind, title, message, tips, modelChar) {
   const box = $("resultBox");
   box.className = "result-box " + kind;
   let html = `<h3>${esc(title)}</h3><p>${esc(message)}</p>`;
   if (modelChar) {
     html += `<div class="model-box"><h4>📖 お手本(きれいな字)</h4>
-      <div class="model-kanji">${esc(modelChar)}</div></div>`;
-  }
-  if (showOrder) {
-    html += `<div class="order-box"><h4>✍️ 正しい書き順(番号のじゅんに)</h4>
-      <canvas id="refCanvas" width="440" height="440"></canvas>
+      <div class="model-kanji">${esc(modelChar)}</div>
+      <h4 class="order-title">✍️ 正しい書き順(番号のじゅんに)</h4>
+      <canvas id="refCanvas" width="280" height="280"></canvas>
       <button class="btn btn-ghost" id="btnReplay" style="display:block;margin:4px auto;">▶ もう一度再生</button></div>`;
   }
   if (tips) {
@@ -1133,7 +1119,7 @@ function showResult(kind, title, message, showOrder, tips, modelChar) {
   }
   box.innerHTML = html;
   box.style.display = "block";
-  if (showOrder) {
+  if (modelChar) {
     animateReference();
     $("btnReplay").addEventListener("click", animateReference);
   }
@@ -1222,13 +1208,6 @@ $("btnUndo").addEventListener("click", () => { state.userStrokes.pop(); redraw()
 $("btnClear").addEventListener("click", () => { state.userStrokes = []; redraw(); });
 $("btnHint").addEventListener("click", showHint);
 $("btnCheck").addEventListener("click", check);
-
-$("scrollUp").addEventListener("click", () => {
-  $("screen-practice").scrollBy({ top: -practiceScrollStep(), behavior: "smooth" });
-});
-$("scrollDown").addEventListener("click", () => {
-  $("screen-practice").scrollBy({ top: practiceScrollStep(), behavior: "smooth" });
-});
 
 // キャンバス上で実際に書いているときだけスクロールを抑止
 document.body.addEventListener("touchmove", e => {
